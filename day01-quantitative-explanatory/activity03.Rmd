@@ -31,7 +31,9 @@ Remember that [Emil Hvitfeldt](https://www.emilhvitfeldt.com/) (of Posit) has pu
 - Run the `load-packages` code chunk or **knit** <img src="../README-img/knit-icon.png" alt="knit" width = "20"/> icon your Rmd document to verify that no errors occur.
 
 ```{r load-packages}
-
+library(tidyverse)
+library(tidymodels)
+library(GGally)
 ```
 
 Since we will be looking at many relationships graphically, it will be nice to not have to code each of these individually.
@@ -64,10 +66,54 @@ Create a new R code chunk below that is titled `load-data` and reads in the abov
 
 We will continue using personal freedom scores, `pf_score`, as the response variable and build on our model that had `pf_expression_control` as the explanatory variable. 
 
+```{r load data}
+# loading the data and filtering the dataset for year '2016'
+hfi <- read_csv("hfi.csv")
+hfi_2016 <- hfi %>% 
+  filter(year == 2016)
+```
+
+
 Create a new R code chunk below, with an appropriate title, that does the following:
 
 - Review the about page of the data set and select at least one additional numeric variables (hint: look for `<dbl>` or `<int>` designations) to describe its distribution. Remember to write your description.
 - You may also wish to do this for `pf_score` and `pf_expression_control` again to help you remember what you noticed last week.
+
+```{r exploratory data analysis}
+skimr::skim(hfi_2016)
+
+# looking into pf_ss, pf_score, and pf_expression_control
+hfi_2016 %>% 
+  ggplot(aes(pf_score))+
+  geom_histogram(fill = "cornflowerblue", 
+                 color = "white")+
+  labs(title = "Distribution of Personal Freedom Score",
+       x = "Personal Freedom Score") +
+  theme_minimal()
+
+
+hfi_2016 %>% 
+  ggplot(aes(pf_expression_control))+
+  geom_histogram(fill = "cornflowerblue", 
+                 color = "white")+
+  labs(title = "Distribution of the Political Pressures and Controls on Media Content Index",
+       x = "Political Pressures and Controls on Media Content Index Score") +
+  theme_minimal()
+
+hfi_2016 %>% 
+  ggplot(aes(pf_ss))+
+  geom_histogram(fill = "cornflowerblue", 
+                 color = "white")+
+  labs(title = "Distribution of the Political Pressures and Controls on Media Content Index",
+       x = "Security and Safety Score") +
+  theme_minimal()
+
+```
+
+The first plot displays the spread of the distribution of Personal Freedom Score which is left skewed, there are a few outliers on the left side of the plot, indicating there are only a few countries with low 'personal freedom score'.
+The second plot shows the Distribution of the Political Pressures and Controls on Media Content Index, which has a pretty flat bell curve, indicating a normal distribution with most of the data points clustered around the center.
+The third plot shows the Distribution of the Security and Safety Score, which is left skewed with a few outliers on the low end of the score.
+
 
 ## Pairwise relationships
 
@@ -99,9 +145,9 @@ Now, we will obtain graphical and numerical summaries to describe the pairwise r
 - Replace `explanatory` in the `select` line with the variable you identified above
 - Run your code chunk or knit your document.
   
-```{verbatim pairs-plot}
+```{r pairs-plot}
 hfi_2016 %>% 
-  select(pf_score, pf_expression_control, explanatory) %>% 
+  select(pf_score, pf_expression_control, pf_ss) %>% 
   ggpairs()
 ```
 
@@ -116,11 +162,15 @@ After running the `pairs-plot` code, answer the following questions:
 1. For each pair of variables, how would you describe the relationship graphically?
   Do any of the relationships look linear?
   Are there any interesting/odd features (outliers, non-linear patterns, etc.)?
+  The variables pf_ss and pf_score have a linear relationship as do the variables pf_score and pf_expression_control. 
+  The variables pf_ss and pf_expression_control do not have a linear relationship, the pattern is very dispersed.
 
 2. For each pair of variables, how would you describe the relationship numerically?
+    pf_score and pf_ss have a correlation of 0.753 which suggests high correlation between the two variables. pf_score and pf_espression_control have a higher correlation of 0.845, suggesting strong linear relationship between the variables.
 
 3. Are your two explanatory variables collinear (correlated)?
   Essentially, this means that adding more than one of these variables to the model would not add much value to the model.
+  Yes, the two explanatory variables are collinear.
   We will talk more on this issue in Activity 4 (other considerations in regression models).
 
 ## The multiple linear regression model
@@ -136,7 +186,7 @@ $$
 - Replace `explanatory`, similarly to what you did in your `pairs-plot` R code chunk.
 - Run your code chunk or knit your document.
   
-```{verbatim mlr-model}
+```{r mlr-model}
 #fit the mlr model
 lm_spec <- linear_reg() %>%
   set_mode("regression") %>%
@@ -145,7 +195,7 @@ lm_spec <- linear_reg() %>%
 lm_spec
 
 mlr_mod <- lm_spec %>% 
-fit(pf_score ~ pf_expression_control + explanatory, data = hfi_2016)
+fit(pf_score ~ pf_expression_control + pf_ss, data = hfi_2016)
 
 # model output
 tidy(mlr_mod)
@@ -157,7 +207,7 @@ After doing this, answer the following questions:
   Remember in Activity 2 that this looked like:
 
 $$
-\hat{y} = b_0 + b_1 \times x_1
+\hat{y} = 1.4998522 + 0.3965278 \times pf_expression_control + 0.4346730\times pf_ss
 $$
   
   where $b_0$ and $b_1$ were your model parameter estimates.
@@ -207,22 +257,22 @@ Fortunately, we can create our own.
 - In the code chunk below titled `binary-pred`, replace "verbatim" with "r" just before the code chunk title.
 - Run your code chunk or knit your document.
   
-```{verbatim binary-pred}
+```{r binary-pred}
 hfi_2016 <- hfi_2016 %>%
   mutate(west_atlantic = if_else(
-    region %in% c("North America", "Latin America & the Caribbean"),
+    !region %in% c("North America", "Latin America & the Caribbean"),
     "No",
     "Yes"
   ))
 ```
 
 7. What is happening in the above code? What new variable did we create? How do you know it is new? What values does it take when?
-
+In the above code, we are creating a new variable called, 'west_atlantic' which is assigned the value of 'Yes' if the region is in North America, Latin America, and the Caribbean, else, it is assigned  'No'.
 
 - In the code chunk below titled `qual-mlr`, replace "verbatim" with "r" just before the code chunk title.
 - Run your code chunk or knit your document.
 
-```{verbatim qual-mlr}
+```{r qual-mlr}
 # review any visual patterns
 hfi_2016 %>% 
   select(pf_score, west_atlantic, pf_expression_control) %>% 
@@ -251,13 +301,13 @@ Also, when looking at your model (`tidy`) output, the `term` label for your qual
 Answer the following questions:
 
 8. What is the label that R assigned to this explanatory variable `term`?
-
+west_atlanticYes
 
 9. What information is represented here?
-
+The information represented is the relationship between west_atlanticYes and pf_expression_control
 
 10. What information is missing here?
-
+west_atlanticNo
 
 Your are essentially fitting two models (or $k$ models, where $k$ is the number of levels in your qualitative variable).
 From your reading, you learned that R is creating an indicator variable (see p. 83).
@@ -270,11 +320,12 @@ You can change this reference level of a categorical variable, which is the leve
 Use `?relevel` to learn more.
 
 11. Write the estimated equation for your MLR model with a qualitative explanatory variable.
-
+\hat{y} = 4.2747325 + 0.1024089 \times west_atlanticYes + 0.5401164\times pf_expression_control
 
 12. Now, for each level of your qualitative variable, write the simplified equation of the estimated line for that level. 
   Note that if your qualitative variable has two levels, you should have two simplified equations.
-
+pf_score(yes) = 4.2747325 + 0.1024089 \times west_atlanticYes + 0.5401164\times pf_expression_control
+pf(no) = 4.2747325 + 0.5401164\times pf_expression_control
 
 
 The interpretation of the coefficients (parameter estimates) in multiple regression is slightly different from that of simple regression.
